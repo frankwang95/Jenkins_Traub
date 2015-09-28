@@ -6,7 +6,7 @@ import Data.Complex
 ---------- POLYNOMIALS ----------
 
 -- Data type representing a polynomial -- finite lists only
--- Representation [a1, a2, ... , an] = a1 + a2 x + ... an x ^ n
+-- Representation [a0, a1, ... , an] = a0 + a1 x + ... an x ^ n
 type Poly = [Complex Double]
 
 -- Data type representing a list of complex roots
@@ -34,10 +34,15 @@ pEval _ [] = 0
 pD :: Poly -> Poly
 pD (x:xs) = zipWith ((*).(:+ 0)) [1..] xs
 
--- Polynomial division of linear term
+-- Polynomial division by a linear term
 -- Computational overlap with pEval
-pLinDiv :: Poly -> Complex Double -> Complex Double -> Poly
-pLinDiv p _ _ = p
+-- Returns floor( P(x) / (x - c) )
+pLinDiv :: Poly -> Complex Double -> Poly
+pLinDiv ps c = tail $ bSeqTrack (reverse ps) c []
+
+bSeqTrack (p:ps) c [] = bSeqTrack ps c [p]
+bSeqTrack (p:ps) c xss@(x:xs) = bSeqTrack ps c $ (p + c * x) : xss
+bSeqTrack [] c xs = xs
 
 -- Remove roots at origin
 -- Improved with vector implementation?
@@ -46,7 +51,11 @@ pRemZeroRoot as = (take shifts as, replicate shifts 0)
 	where
 		shifts = countLeadZeros $ reverse as
 		countLeadZeros (0 : as) = 1 + countLeadZeros as
-		countLeadZeros (_:as) = 0 
+		countLeadZeros (_:as) = 0
+
+-- Check a polynomial for valididty
+pCheck :: Poly -> Bool
+pCheck p = (last p) == 1
 
 
 ---------- JENKINS-TRAUB ----------
@@ -55,9 +64,28 @@ pRemZeroRoot as = (take shifts as, replicate shifts 0)
 sS :: [Complex Double]
 sS = map (:+ 0) [0..]
 
--- Stage one fixed-shift progressor
+-- inititial h value
+h0 :: Poly
+h0 = pD pT
+
+-- Stage one s=0 progressor function for h-sequence
 s1HAdv :: Poly -> Poly -> Poly
-s1HAdv p h = pLinDiv inner 1 0
+s1HAdv p h = pLinDiv inner 0
 	where
-		c = - pEval 0 h / pEval 0 p
-		inner = pSub h $ pSMult c p 
+		c = pEval 0 h / pEval 0 p
+		inner = pSub h $ pSMult c p
+
+tFunc :: Poly -> Poly -> Complex Double
+tFunc p h = - pEval 0 p / (pEval 0 $ pSMult (1 / last h) h)
+
+s1HSeq :: Poly -> Int -> Poly
+s1HSeq p n
+	| n == 0 = h0
+	| otherwise = s1HAdv p $ s1HSeq p $ n - 1
+
+---------- TESTING ----------
+pT :: [Complex Double]
+pT = [-6, 11, -6, 1]
+
+
+---------- MAIN----------
