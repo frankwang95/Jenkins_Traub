@@ -12,27 +12,28 @@ type Poly = [Complex Double]
 -- Data type representing a list of complex roots
 type Roots = [Complex Double]
 
--- Add two polynomials
-pAdd :: Poly -> Poly -> Poly
-pAdd (a:as) (b:bs) = (a + b) : pAdd as bs
-pAdd [] bs = bs
-pAdd as [] = as
-
-pSub :: Poly -> Poly -> Poly
-pSub p q = pAdd p $ map (* ((-1) :+ 0)) q
+instance Num a => Num ([] a) where
+	negate = map negate
+	(+) [] bs = bs
+	(+) as [] = as
+	(+) (a:as) (b:bs) = (a + b) : (+) as bs
+	(*) _ _ = []
+	fromInteger a = [fromInteger a]
+	abs = map abs
+	signum _ = []
 
 -- Polynomial scalar multiplication with a complex constant
 pSMult :: Complex Double -> Poly -> Poly
 pSMult s = map (*s)
 
+-- Polynomial derivative
+pD :: Poly -> Poly
+pD (x:xs) = zipWith ((*).(:+ 0)) [1..] xs
+
 -- Evaluate a polynomial at a point
 pEval :: Complex Double -> Poly -> Complex Double
 pEval x (a:as) = a + (x * pEval x as)
 pEval _ [] = 0
-
--- Polynomial derivative
-pD :: Poly -> Poly
-pD (x:xs) = zipWith ((*).(:+ 0)) [1..] xs
 
 -- Polynomial division by a linear term
 -- Computational overlap with pEval
@@ -53,39 +54,55 @@ pRemZeroRoot as = (take shifts as, replicate shifts 0)
 		countLeadZeros (0 : as) = 1 + countLeadZeros as
 		countLeadZeros (_:as) = 0
 
--- Check a polynomial for valididty
-pCheck :: Poly -> Bool
-pCheck p = (last p) == 1
-
 
 ---------- JENKINS-TRAUB ----------
 
--- S-Sequence
+m = 5
+
+-- s-Sequence
 sS :: [Complex Double]
 sS = map (:+ 0) [0..]
 
 -- inititial h value
-h0 :: Poly
-h0 = pD pT
+h0 :: Poly -> Poly
+h0 = pD
 
--- Stage one s=0 progressor function for h-sequence
+-- s1 s=0 progressor function for h-sequence
 s1HAdv :: Poly -> Poly -> Poly
 s1HAdv p h = pLinDiv inner 0
 	where
 		c = pEval 0 h / pEval 0 p
-		inner = pSub h $ pSMult c p
+		inner = h - pSMult c p
 
+-- computes the new polynomial after m s1 shifts
+s1H :: Poly -> Poly
+s1H p = foldr s1HAdv (h0 p) $ replicate m pT
+
+
+
+-- takes a hM and returns hL after performing s2 shifts
+s2H :: Poly -> Poly
+s2H _ = []
+
+-- gets the value of t given a certain polynomial p and h-poly h.
 tFunc :: Poly -> Poly -> Complex Double
 tFunc p h = - pEval 0 p / (pEval 0 $ pSMult (1 / last h) h)
 
-s1HSeq :: Poly -> Int -> Poly
-s1HSeq p n
-	| n == 0 = h0
-	| otherwise = s1HAdv p $ s1HSeq p $ n - 1
+jT :: Poly -> Roots
+jT p = []
+	where
+		(pClean, zRoots) = pRemZeroRoot $ pSMult (last p) p
+		hM = s1H pClean
+
 
 ---------- TESTING ----------
+
 pT :: [Complex Double]
 pT = [-6, 11, -6, 1]
 
 
 ---------- MAIN----------
+
+main = do
+	let p = pT
+	putStrLn "Nothing here yet"
