@@ -2,6 +2,7 @@ module Main where
 
 import Data.Complex
 import Data.Maybe
+import System.Exit
 
 
 ---------- POLYNOMIALS ----------
@@ -58,21 +59,25 @@ pRemZeroRoot as = (take shifts as, replicate shifts 0)
 
 ---------- NEWTON ----------
 
-xAdv :: Complex Double -> Poly -> Complex Double
-xAdv x p
+-- progressor function for Newton's Method
+newtonAdv :: Complex Double -> Poly -> Complex Double
+newtonAdv x p
 	| otherwise = ((x * pDp) - pEval x p) /pDp
 		where pDp = pEval x $ pD p
 
+-- solve with Newton's Method
+-- Redundancy not need because Cauchy Polynomials are nice
 newton :: Complex Double -> Poly -> Complex Double
 newton x0 p
 	| x == x0 = x
 	| otherwise = newton x p
-		where x = xAdv x0 p
+		where x = newtonAdv x0 p
 
 
 ---------- JENKINS-TRAUB ----------
 
-m = 5
+m = 5 -- number of stage 1 iterations
+s2M = 30 -- number of conversion attempts before stage 2 attempts new s
 
 -- s-Sequence
 sSeq :: [Complex Double]
@@ -83,23 +88,37 @@ h0 :: Poly -> Poly
 h0 = pD
 
 -- s1 s=0 progressor function for h-sequence
-s1HAdv :: Poly -> Poly -> Poly
-s1HAdv p h = pLinDiv inner 0
+sHAdv :: Complex Double -> Poly -> Poly -> Poly
+sHAdv s p h = pLinDiv inner s
 	where
-		c = pEval 0 h / pEval 0 p
+		c = pEval s h / pEval s p
 		inner = h - pSMult c p
 
 -- computes the new polynomial after m s1 shifts
 s1H :: Poly -> Poly
-s1H p = foldr s1HAdv (h0 p) $ replicate m pT
+s1H p = foldr (sHAdv 0) h00 $ replicate m pT
+	where h00 = h0 p
 
 -- returns the Cauchy Polynomial of p, coefficients will be real
 cauchyP :: Poly -> Poly
 cauchyP (x:xs) = (- abs x) : map abs xs
 
 -- takes a hM and returns hL after performing s2 shifts
+-- if P(s) == 0, function will eventually advance to next s
 s2H :: Poly -> Poly
-s2H _ = []
+s2H p = s2HRec (pD p) s2M 0 []
+	where
+		s2HRec h n m xs@(x:y:z:zs) -- prevents redundant computation of s
+			| n == 0 = s2HRec (pD p) s2M (m + 1) []
+			| (realPart (abs (x - y)) <= 0.5 * realPart (abs y)) &&
+			  (realPart (abs (y - z)) <= 0.5 * realPart (abs z)) = h
+			| otherwise = s2HRec (sHAdv (s!!m) p h) (n - 1) m $ tFunc p h : xs
+		s2HRec h n m xs = s2HRec (sHAdv (s!!m) p h) (n - 1) m $ tFunc p h : xs
+		h00 = h0 p
+		s = map (\x -> newton 0 (cauchyP p) * (cos (49 + x * 94) :+ sin (49 + x * 94))) [0..]
+
+s3H :: Poly -> Poly
+s3H _ = []
 
 -- gets the value of t given a certain polynomial p and h-poly h.
 tFunc :: Poly -> Poly -> Complex Double
@@ -110,6 +129,7 @@ jT p = []
 	where
 		(pClean, zRoots) = pRemZeroRoot $ pSMult (last p) p
 		hM = s1H pClean
+		hL = s2H hM
 
 
 ---------- TESTING ----------
@@ -123,3 +143,7 @@ pT = [-6, 11, -6, 1]
 main = do
 	let p = pT
 	putStrLn "Nothing here yet"
+
+
+
+---------------------------------------- TODO LIST
