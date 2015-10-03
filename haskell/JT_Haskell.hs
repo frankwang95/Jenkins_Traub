@@ -1,8 +1,6 @@
 module JenkinsTraub where
 
 import Data.Complex
-import Data.Maybe
-import System.Exit
 
 
 ---------- POLYNOMIALS ----------
@@ -75,7 +73,7 @@ newton x0 p
 
 m = 5 -- number of stage 1 iterations
 s2M = 30 -- number of conversion attempts before stage 2 attempts new s
-prec = 0.00000001
+prec = 0.00000000000000001
 
 -- s-Sequence
 sSeq :: [Complex Double]
@@ -115,23 +113,48 @@ s2H p hM = s2HRec hM s2M 0 []
 		h00 = h0 p
 		s = map (\x -> newton 0 (cauchyP p) * (cos (49 + x * 94) :+ sin (49 + x * 94))) [0..]
 
+-- tests for function explosion
+cNaN :: Complex Double -> Bool
+cNaN (a :+ b) = isNaN a || isNaN b
+naNList :: [Complex Double] -> Bool
+naNList (x:xs)
+	| cNaN x = True
+	| otherwise = naNList xs
+naNList [] = False
+
 -- takes hL and returns the Jenkins-Traub root
 s3H :: Poly -> (Poly, [Complex Double]) -> Int -> IO()
 s3H p (hL, sL) n = s3HRec hL sL n
 	where
 		s3HRec h xss@(x:y:xs) n
-			| n == 0 = putStrLn $ show x
-			| realPart (abs (x - y)) < prec = putStrLn $ show x
+			| naNList h = do
+				putStrLn "Polynomial explosion"
+				putStrLn $ show x
+			| n == 0 = do
+				putStrLn "Overiterated"
+				putStrLn $ show x
+			| realPart (abs (x - y)) < prec = do
+				putStrLn "Terms are close"
+				putStrLn $ show x
 			| otherwise = do
 				putStrLn $ show x
 				s3HRec (sHAdv x p h) ((tFunc p h) : xss) $ n - 1
+
+--s3H' :: Poly -> (Poly, [Complex Double]) -> Int -> (Poly, 
+s3H' p (hL, sL) n = s3HRec hL sL n
+	where
+		s3HRec h xss@(x:y:xs) n
+			| n == 0 = (h, x, y)
+			| realPart (abs (x - y)) < prec = (h, x, y)
+			| otherwise = do s3HRec (sHAdv x p h) ((tFunc p h) : xss) $ n - 1
+
 
 -- gets the value of t given a certain polynomial p and h-poly h.
 tFunc :: Poly -> Poly -> Complex Double
 tFunc p h = - pEval 0 p / (pEval 0 $ pSMult (1 / last h) h)
 
-jT :: Poly -> IO()
-jT p = s3H p hL 10
+--jT :: Poly -> IO()
+jT p = s3H' p hL 100
 	where
 		(pClean, nRoots) = pRemZeroRoot $ pSMult (last p) p
 		hL = s2H pClean $ s1H pClean
@@ -150,5 +173,10 @@ main = do
 	putStrLn "Nothing here yet"
 
 
+first (a,b,c) = a
+second (a,b,c) = b
+third (a,b,c) = c
+
 
 ---------------------------------------- TODO LIST
+-- Why NaN explosion close to root?? Does halting solve??
