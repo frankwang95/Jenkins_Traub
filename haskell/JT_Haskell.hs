@@ -1,6 +1,7 @@
 module Main where
 
 import Data.Complex
+import Data.Maybe
 
 
 ---------- POLYNOMIALS ----------
@@ -55,13 +56,27 @@ pRemZeroRoot as = (take shifts as, replicate shifts 0)
 		countLeadZeros (_:as) = 0
 
 
+---------- NEWTON ----------
+
+xAdv :: Complex Double -> Poly -> Complex Double
+xAdv x p
+	| otherwise = ((x * pDp) - pEval x p) /pDp
+		where pDp = pEval x $ pD p
+
+newton :: Complex Double -> Poly -> Complex Double
+newton x0 p
+	| x == x0 = x
+	| otherwise = newton x p
+		where x = xAdv x0 p
+
+
 ---------- JENKINS-TRAUB ----------
 
 m = 5
 
 -- s-Sequence
-sS :: [Complex Double]
-sS = map (:+ 0) [0..]
+sSeq :: [Complex Double]
+sSeq = map (:+ 0) [0..]
 
 -- inititial h value
 h0 :: Poly -> Poly
@@ -78,7 +93,9 @@ s1HAdv p h = pLinDiv inner 0
 s1H :: Poly -> Poly
 s1H p = foldr s1HAdv (h0 p) $ replicate m pT
 
-
+-- returns the Cauchy Polynomial of p, coefficients will be real
+cauchyP :: Poly -> Poly
+cauchyP (x:xs) = (- abs x) : map abs xs
 
 -- takes a hM and returns hL after performing s2 shifts
 s2H :: Poly -> Poly
