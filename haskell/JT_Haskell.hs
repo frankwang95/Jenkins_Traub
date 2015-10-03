@@ -1,4 +1,4 @@
-module JenkinsTraub where
+module JT_Haskell where
 
 import Data.Complex
 
@@ -92,7 +92,7 @@ sHAdv s p h = pLinDiv inner s
 
 -- computes the new polynomial after m s1 shifts
 s1H :: Poly -> Poly
-s1H p = foldr (sHAdv 0) h00 $ replicate m pT
+s1H p = foldr (sHAdv 0) h00 $ replicate m p
 	where h00 = h0 p
 
 -- returns the Cauchy Polynomial of p, coefficients will be real
@@ -140,7 +140,6 @@ s3H p (hL, sL) n = s3HRec hL sL n
 				putStrLn $ show x
 				s3HRec (sHAdv x p h) ((tFunc p h) : xss) $ n - 1
 
---s3H' :: Poly -> (Poly, [Complex Double]) -> Int -> (Poly, 
 s3H' p (hL, sL) n = s3HRec hL sL n
 	where
 		s3HRec h xss@(x:y:xs) n
@@ -153,30 +152,13 @@ s3H' p (hL, sL) n = s3HRec hL sL n
 tFunc :: Poly -> Poly -> Complex Double
 tFunc p h = - pEval 0 p / (pEval 0 $ pSMult (1 / last h) h)
 
---jT :: Poly -> IO()
-jT p = s3H' p hL 100
+jT :: Poly -> IO()
+jT p = s3H p hL 100
 	where
 		(pClean, nRoots) = pRemZeroRoot $ pSMult (last p) p
 		hL = s2H pClean $ s1H pClean
 
 
----------- TESTING ----------
-
-pT :: [Complex Double]
-pT = [-6, 11, -6, 1]
-
-
----------- MAIN----------
-
-main = do
-	let p = pT
-	putStrLn "Nothing here yet"
-
-
-first (a,b,c) = a
-second (a,b,c) = b
-third (a,b,c) = c
-
-
 ---------------------------------------- TODO LIST
 -- Why NaN explosion close to root?? Does halting solve??
+-- Deflation
