@@ -65,5 +65,8 @@ main = do
 	rawData <- B.readFile "poly.txt"
 	let text = filter (/= ' ') $ B.unpack rawData
 	let p = map (conv.extr.P.parseOnly parseComplexx) $ map B.pack $ words $ getParen text False
+	let (root, err) = jT p
 
-	jT p
+	putStrLn $ "Tested polynomial: " ++ (show p) ++ "\n"
+	putStrLn $ "Result: " ++ (show root)
+	putStrLn $ "Exit cde: " ++ (show err)
