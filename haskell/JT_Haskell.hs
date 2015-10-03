@@ -1,4 +1,4 @@
-module Main where
+module JenkinsTraub where
 
 import Data.Complex
 import Data.Maybe
@@ -10,9 +10,6 @@ import System.Exit
 -- Data type representing a polynomial -- finite lists only
 -- Representation [a0, a1, ... , an] = a0 + a1 x + ... an x ^ n
 type Poly = [Complex Double]
-
--- Data type representing a list of complex roots
-type Roots = [Complex Double]
 
 instance Num a => Num ([] a) where
 	negate = map negate
@@ -49,12 +46,12 @@ bSeqTrack [] c xs = xs
 
 -- Remove roots at origin
 -- Improved with vector implementation?
-pRemZeroRoot :: Poly -> (Poly, Roots)
-pRemZeroRoot as = (take shifts as, replicate shifts 0)
+pRemZeroRoot :: Poly -> (Poly, Int)
+pRemZeroRoot p = (drop shifts p, shifts)
 	where
-		shifts = countLeadZeros $ reverse as
-		countLeadZeros (0 : as) = 1 + countLeadZeros as
-		countLeadZeros (_:as) = 0
+		shifts = countLeadZeros p
+		countLeadZeros (0 : p) = 1 + countLeadZeros p
+		countLeadZeros _ = 0
 
 
 ---------- NEWTON ----------
@@ -78,6 +75,7 @@ newton x0 p
 
 m = 5 -- number of stage 1 iterations
 s2M = 30 -- number of conversion attempts before stage 2 attempts new s
+prec = 0.00000001
 
 -- s-Sequence
 sSeq :: [Complex Double]
@@ -103,33 +101,40 @@ s1H p = foldr (sHAdv 0) h00 $ replicate m pT
 cauchyP :: Poly -> Poly
 cauchyP (x:xs) = (- abs x) : map abs xs
 
--- takes a hM and returns hL after performing s2 shifts
+-- takes hM and returns hL after performing s2 shifts
 -- if P(s) == 0, function will eventually advance to next s
-s2H :: Poly -> Poly
-s2H p = s2HRec (pD p) s2M 0 []
+s2H :: Poly -> Poly -> (Poly, [Complex Double])
+s2H p hM = s2HRec hM s2M 0 []
 	where
 		s2HRec h n m xs@(x:y:z:zs) -- prevents redundant computation of s
-			| n == 0 = s2HRec (pD p) s2M (m + 1) []
+			| n == 0 = s2HRec h s2M (m + 1) []
 			| (realPart (abs (x - y)) <= 0.5 * realPart (abs y)) &&
-			  (realPart (abs (y - z)) <= 0.5 * realPart (abs z)) = h
+			  (realPart (abs (y - z)) <= 0.5 * realPart (abs z)) = (h, [x,y])
 			| otherwise = s2HRec (sHAdv (s!!m) p h) (n - 1) m $ tFunc p h : xs
 		s2HRec h n m xs = s2HRec (sHAdv (s!!m) p h) (n - 1) m $ tFunc p h : xs
 		h00 = h0 p
 		s = map (\x -> newton 0 (cauchyP p) * (cos (49 + x * 94) :+ sin (49 + x * 94))) [0..]
 
-s3H :: Poly -> Poly
-s3H _ = []
+-- takes hL and returns the Jenkins-Traub root
+s3H :: Poly -> (Poly, [Complex Double]) -> Int -> IO()
+s3H p (hL, sL) n = s3HRec hL sL n
+	where
+		s3HRec h xss@(x:y:xs) n
+			| n == 0 = putStrLn $ show x
+			| realPart (abs (x - y)) < prec = putStrLn $ show x
+			| otherwise = do
+				putStrLn $ show x
+				s3HRec (sHAdv x p h) ((tFunc p h) : xss) $ n - 1
 
 -- gets the value of t given a certain polynomial p and h-poly h.
 tFunc :: Poly -> Poly -> Complex Double
 tFunc p h = - pEval 0 p / (pEval 0 $ pSMult (1 / last h) h)
 
-jT :: Poly -> Roots
-jT p = []
+jT :: Poly -> IO()
+jT p = s3H p hL 10
 	where
-		(pClean, zRoots) = pRemZeroRoot $ pSMult (last p) p
-		hM = s1H pClean
-		hL = s2H hM
+		(pClean, nRoots) = pRemZeroRoot $ pSMult (last p) p
+		hL = s2H pClean $ s1H pClean
 
 
 ---------- TESTING ----------
