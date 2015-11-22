@@ -71,8 +71,8 @@ newton x0 p
 
 ---------- JENKINS-TRAUB ----------
 
-m = 10 -- number of stage 1 iterations
-s2M = 7 -- number of conversion attempts before stage 2 attempts new s
+m = 5 -- number of stage 1 iterations
+s2M = 5 -- number of conversion attempts before stage 2 attempts new s
 
 -- s-Sequence
 sSeq :: [Complex Double]
@@ -80,19 +80,21 @@ sSeq = map (:+ 0) [0..]
 
 -- inititial h value
 h0 :: Poly -> Poly
-h0 p = pSMult (1 / (fromIntegral (length p))) p
+h0 p = pD p
 
 -- s1 s=0 progressor function for h-sequence
 sHAdv :: Complex Double -> Poly -> Poly -> Poly
 sHAdv s p h = pLinDiv inner s
     where
         c = pEval s p / pEval s h
-        inner = p - pSMult c p
+        inner = p - pSMult c h
 
 -- computes the new polynomial after m s1 shifts
 s1H :: Poly -> Poly
-s1H p = foldr (sHAdv 0) h00 $ replicate m p
-    where h00 = h0 p
+s1H p = foldr (sHAdv 0) h00 $ replicate m pp
+    where
+        h00 = h0 p
+        pp = pSMult (last p) p
 
 -- returns the Cauchy Polynomial of p, coefficients will be real
 cauchyP :: Poly -> Poly
@@ -101,14 +103,14 @@ cauchyP (x:xs) = (- abs x) : map abs xs
 -- takes hM and returns hL after performing s2 shifts
 -- if P(s) == 0, function will eventually advance to next s
 s2H :: Poly -> Poly -> (Poly, [Complex Double])
-s2H p hM = s2HRec hM s2M 0 []
+s2H p hM = s2HRec hM s2M []
     where
-        s2HRec h n m xs@(x:y:z:zs) -- prevents redundant computation of s
-            | n == 0 = s2HRec h s2M (m + 1) []
+        s2HRec h n xs@(x:y:z:zs) -- prevents redundant computation of s
+            | n == 0 = s2HRec h s2M []
             | (realPart (abs (x - y)) <= 0.1 * realPart (abs y)) &&
               (realPart (abs (y - z)) <= 0.1 * realPart (abs z)) = (h, [x,y])
-            | otherwise = s2HRec (sHAdv (s!!m) p h) (n - 1) m $ tFunc p h : xs
-        s2HRec h n m xs = s2HRec (sHAdv (s!!m) p h) (n - 1) m $ tFunc p h : xs
+            | otherwise = s2HRec (sHAdv (s!!m) p h) (n - 1) $ tFunc p h : xs
+        s2HRec h n xs = s2HRec (sHAdv (s!!m) p h) (n - 1) $ tFunc p h : xs
         h00 = h0 p
         s = map (\x -> newton 0 (cauchyP p) * (cos (49 + x * 94) :+ sin (49 + x * 94))) [0..]
 
@@ -146,7 +148,7 @@ jTTest p = do
     let (pClean, nRoots) = pRemZeroRoot $ pSMult (1 / last p) p
     let st1 = s1H pClean
     let (st2, xs) = s2H pClean st1
-    let st3 = s3H pClean (st2, xs) 10000
+    let st3 = s3H pClean (st2, xs) 1000
     putStrLn "=========================================================================================================================="
     putStrLn $ "Testing Polynomial: " ++ show p
     putStrLn "=========================================================================================================================="
@@ -161,5 +163,8 @@ jTTest p = do
 -- Why NaN explosion close to root?? Does halting solve??
 -- Deflation
 
-pT :: [Complex Double]
-pT = [1.716, 4.31, (-3.6), 1]
+pTF :: [Complex Double]
+pTF = [(-1.65), 0.4, (-2.1), 1.2]
+
+pTS :: [Complex Double]
+pTS = [-2, 3, 1]
