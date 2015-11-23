@@ -1,5 +1,6 @@
 module JT_Haskell where
 import Data.Complex
+import Debug.Trace
 
 
 ---------- POLYNOMIALS ----------
@@ -61,17 +62,17 @@ newtonAdv x p
 
 -- solve with Newton's Method
 -- Redundancy not need because Cauchy Polynomials are nice
-newton :: Complex Double -> Poly -> Complex Double
-newton x0 p
-    | x == x0 = x
-    | otherwise = newton x p
+newton :: Double -> Complex Double -> Poly -> Complex Double
+newton ep x0 p
+    | realPart (abs (x - x0)) < ep  = x
+    | otherwise = newton ep x p
         where x = newtonAdv x0 p
 
 
 ---------- JENKINS-TRAUB ----------
 
-m = 5 -- number of stage 1 iterations
-s2M = 5 -- number of conversion attempts before stage 2 attempts new s
+m = 10 -- number of stage 1 iterations
+s2M = 1 -- number of conversion attempts before stage 2 attempts new s
 
 -- inititial h value by taking derivative
 h0 :: Poly -> Poly
@@ -117,14 +118,18 @@ s2H p (hM, c) ep
     | c == 0 = (hM, [], c)
     | otherwise = s2HRec hM s2M []
         where
+            h00 = h0 p
+            sFunc x = newton ep 0 (cauchyP p) * (cos (49 + x * 94) :+ sin (49 + x * 94))
+            s = map sFunc [0..]
             s2HRec h n xs@(x:y:z:zs) -- prevents redundant computation of s
+                | c == 0 = (next, [], c)
                 | n == 0 = s2HRec h s2M []
                 | (realPart (abs (x - y)) <= 0.1 * realPart (abs y)) &&
                   (realPart (abs (y - z)) <= 0.1 * realPart (abs z)) = (h, [x,y], 1)
-                | otherwise = s2HRec (fst (sHAdv ep (s!!m) p h)) (n - 1) $ tFunc p h : xs
-            s2HRec h n xs = s2HRec (fst (sHAdv ep (s!!m) p h)) (n - 1) $ tFunc p h : xs
-            h00 = h0 p
-            s = map (\x -> newton 0 (cauchyP p) * (cos (49 + x * 94) :+ sin (49 + x * 94))) [0..]
+                | otherwise = s2HRec next (n - 1) $ tFunc p h : xs
+                    where (next, c) = sHAdv ep (s!!m) p h
+            s2HRec h n xs = s2HRec next (n - 1) $ tFunc p h : xs
+                where (next, c) = sHAdv ep (s!!m) p h
 
 -- tests for function explosion
 cNaN :: Complex Double -> Bool
@@ -160,7 +165,7 @@ jTTest p = do
     let (pClean, nRoots) = pRemZeroRoot $ pSMult (1 / last p) p
     let (st1, c) = s1H pClean 0.0000001
     let (st2, xs, c) = s2H pClean (st1, c) 0.0000001
-    let st3 = s3H pClean (st2, xs, c) 1000 0.0000001
+    let st3 = s3H pClean (st2, xs, c) 100 0.0000001
     putStrLn "=========================================================================================================================="
     putStrLn $ "Testing Polynomial: " ++ show p
     putStrLn "=========================================================================================================================="
