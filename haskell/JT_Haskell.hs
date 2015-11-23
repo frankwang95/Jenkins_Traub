@@ -1,5 +1,4 @@
 module JT_Haskell where
-
 import Data.Complex
 
 
@@ -74,45 +73,58 @@ newton x0 p
 m = 5 -- number of stage 1 iterations
 s2M = 5 -- number of conversion attempts before stage 2 attempts new s
 
--- s-Sequence
-sSeq :: [Complex Double]
-sSeq = map (:+ 0) [0..]
-
--- inititial h value
+-- inititial h value by taking derivative
 h0 :: Poly -> Poly
 h0 p = pD p
 
--- s1 s=0 progressor function for h-sequence
-sHAdv :: Complex Double -> Poly -> Poly -> Poly
-sHAdv s p h = pLinDiv inner s
+-- gets the value of t given a certain polynomial p and h-poly h.
+tFunc :: Poly -> Poly -> Complex Double
+tFunc p h = - pEval 0 p / (pEval 0 $ h)
+
+-- general h-polynomial advancer
+-- takes an error value, an s-value, the original polynomial, and the last h-polynomial
+-- returns a polynomial and a code for root found (0) and continued (1)
+sHAdv :: Double -> Complex Double -> Poly -> Poly -> (Poly, Int)
+sHAdv ep s p h
+    | realPart (abs c) < ep = ([s], 0)
+    | otherwise = (pLinDiv inner s, 1)
     where
         c = pEval s p / pEval s h
         inner = p - pSMult c h
 
--- computes the new polynomial after m s1 shifts
-s1H :: Poly -> Poly
-s1H p = foldr (sHAdv 0) h00 $ replicate m pp
+-- performs stage-1 iterations
+-- takes an polynomial and an error value
+-- returns a polynomial and a code for root found (0) and continued (1)
+s1H :: Poly -> Double -> (Poly, Int)
+s1H p ep = s1HRec m $ h0 p
     where
-        h00 = h0 p
-        pp = pSMult (last p) p
+        s1HRec mm hh
+            | code == 0 = (next, 0)
+            | mm == 0 = (next, 1)
+            | otherwise = s1HRec (mm - 1) $ next
+            where (next, code) = sHAdv ep 0 p hh  
 
 -- returns the Cauchy Polynomial of p, coefficients will be real
 cauchyP :: Poly -> Poly
 cauchyP (x:xs) = (- abs x) : map abs xs
 
--- takes hM and returns hL after performing s2 shifts
+-- performs stage-2 iterations
+-- takes the original polynomial, the result of the stage-1 shifts, and an error value
+-- returns a polynomial and a code for root found (0) and continued (1)
 -- if P(s) == 0, function will eventually advance to next s
-s2H :: Poly -> Poly -> (Poly, [Complex Double])
-s2H p hM = s2HRec hM s2M []
-    where
-        s2HRec h n xs@(x:y:z:zs) -- prevents redundant computation of s
-            | n == 0 = s2HRec h s2M []
-            | (realPart (abs (x - y)) <= 0.1 * realPart (abs y)) &&
-              (realPart (abs (y - z)) <= 0.1 * realPart (abs z)) = (h, [x,y])
-            | otherwise = s2HRec (sHAdv (s!!m) p h) (n - 1) $ tFunc p h : xs
-        s2HRec h n xs = s2HRec (sHAdv (s!!m) p h) (n - 1) $ tFunc p h : xs
-        h00 = h0 p
-        s = map (\x -> newton 0 (cauchyP p) * (cos (49 + x * 94) :+ sin (49 + x * 94))) [0..]
+s2H :: Poly -> (Poly, Int) -> Double -> (Poly, [Complex Double], Int)
+s2H p (hM, c) ep
+    | c == 0 = (hM, [], c)
+    | otherwise = s2HRec hM s2M []
+        where
+            s2HRec h n xs@(x:y:z:zs) -- prevents redundant computation of s
+                | n == 0 = s2HRec h s2M []
+                | (realPart (abs (x - y)) <= 0.1 * realPart (abs y)) &&
+                  (realPart (abs (y - z)) <= 0.1 * realPart (abs z)) = (h, [x,y], 1)
+                | otherwise = s2HRec (fst (sHAdv ep (s!!m) p h)) (n - 1) $ tFunc p h : xs
+            s2HRec h n xs = s2HRec (fst (sHAdv ep (s!!m) p h)) (n - 1) $ tFunc p h : xs
+            h00 = h0 p
+            s = map (\x -> newton 0 (cauchyP p) * (cos (49 + x * 94) :+ sin (49 + x * 94))) [0..]
 
 -- tests for function explosion
 cNaN :: Complex Double -> Bool
@@ -124,31 +136,31 @@ naNList (x:xs)
 naNList [] = False
 
 -- takes hL and returns the Jenkins-Traub root
-s3H :: Poly -> (Poly, [Complex Double]) -> Int -> (Complex Double ,Int)
-s3H p (hL, sL) n = s3HRec hL sL n
+s3H :: Poly -> (Poly, [Complex Double], Int) -> Int -> Double -> (Complex Double, Int)
+s3H p (hL, sL, c) n ep
+    | c == 0 = ((head hL), 1)
+    | otherwise = s3HRec hL sL n
     where
         s3HRec h xss@(x:y:xs) n
-            | naNList h = (x, 0)
-            | n == 0 = (x, 1)
-            | x == y = (x, 2)
-            | otherwise = s3HRec (sHAdv x p h) ((tFunc p h) : xss) $ n - 1
+           -- | naNList h = (x, 0)
+            | n == 0 = (x, 2)
+            | realPart (abs (x - y)) < ep = (x, 1)
+            | otherwise = s3HRec (fst (sHAdv ep x p h)) ((tFunc p h) : xss) $ n - 1
 
--- gets the value of t given a certain polynomial p and h-poly h.
-tFunc :: Poly -> Poly -> Complex Double
-tFunc p h = - pEval 0 p / (pEval 0 $ h)
-
-jT :: Poly -> (Complex Double ,Int)
-jT p = s3H pClean hL 100
+-- takes a polynomial deg >= 2 to solve, a max number of stage 3 iterations, abd an epsilon error
+-- returns polynomial roots and a completion (2) or cutoff (1) code
+jT :: Poly -> Int -> Double -> (Complex Double ,Int)
+jT p n ep = s3H pClean hL n ep
     where
         (pClean, nRoots) = pRemZeroRoot $ pSMult (1 / last p) p
-        hL = s2H pClean $ s1H pClean
+        hL = s2H pClean (s1H pClean ep) ep
 
 jTTest :: Poly -> IO()
 jTTest p = do
     let (pClean, nRoots) = pRemZeroRoot $ pSMult (1 / last p) p
-    let st1 = s1H pClean
-    let (st2, xs) = s2H pClean st1
-    let st3 = s3H pClean (st2, xs) 1000
+    let (st1, c) = s1H pClean 0.0000001
+    let (st2, xs, c) = s2H pClean (st1, c) 0.0000001
+    let st3 = s3H pClean (st2, xs, c) 1000 0.0000001
     putStrLn "=========================================================================================================================="
     putStrLn $ "Testing Polynomial: " ++ show p
     putStrLn "=========================================================================================================================="
@@ -160,11 +172,10 @@ jTTest p = do
 
 
 ---------------------------------------- TODO LIST
--- Why NaN explosion close to root?? Does halting solve??
 -- Deflation
 
 pTF :: [Complex Double]
-pTF = [(-1.65), 0.4, (-2.1), 1.2]
+pTF = [(-1.518), 3.965, (-3.45), 1]
 
 pTS :: [Complex Double]
 pTS = [-2, 3, 1]
