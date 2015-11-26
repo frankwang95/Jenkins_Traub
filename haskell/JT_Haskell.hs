@@ -154,33 +154,13 @@ s3H p (hL, sL, c) n ep
 
 -- takes a polynomial deg >= 2 to solve, a max number of stage 3 iterations, abd an epsilon error
 -- returns polynomial roots and a completion (2) or cutoff (1) code
-jT :: Poly -> Int -> Double -> (Complex Double ,Int)
-jT p n ep = s3H pClean hL n ep
+jT :: Poly -> Int -> Double -> [Complex Double]
+jT p n ep
+    | code == 1 = []
+    | pDef == [] = []
+    | otherwise = foundRoot : jT pDef n ep
     where
+        (foundRoot, code) = (s3H pClean hL n ep)
+        pDef = pLinDiv p foundRoot
         (pClean, nRoots) = pRemZeroRoot $ pSMult (1 / last p) p
         hL = s2H pClean (s1H pClean ep) ep
-
-jTTest :: Poly -> IO()
-jTTest p = do
-    let (pClean, nRoots) = pRemZeroRoot $ pSMult (1 / last p) p
-    let (st1, c) = s1H pClean 0.0000001
-    let (st2, xs, c) = s2H pClean (st1, c) 0.0000001
-    let st3 = s3H pClean (st2, xs, c) 100 0.0000001
-    putStrLn "=========================================================================================================================="
-    putStrLn $ "Testing Polynomial: " ++ show p
-    putStrLn "=========================================================================================================================="
-    putStrLn $ "\tZero Roots: " ++ show nRoots
-    putStrLn $ "\tClean Polynomial: " ++ show pClean
-    putStrLn $ "\tStage 1 Polynomial: " ++ show st1
-    putStrLn $ "\tStage 2 Polynomial: " ++ show st2
-    putStrLn $ "\tStage 3 Polynomial: " ++ show st3
-
-
----------------------------------------- TODO LIST
--- Deflation
-
-pTF :: [Complex Double]
-pTF = [(-1.518), 3.965, (-3.45), 1]
-
-pTS :: [Complex Double]
-pTS = [-2, 3, 1]
