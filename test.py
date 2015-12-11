@@ -30,7 +30,7 @@ def runTest(polyList, exe, err):
 	for i in polyList:
 		if i.testPoly(exe, err): sucCount += 1
 	return ({'total' : 0,
-			'sucRate' : sucCount / total})
+			'sucRate' : float(sucCount) / total})
 
 
 # OBJECTS
@@ -44,7 +44,8 @@ class TestPoly:
 		self.tested = False
 
 	def testPoly(self, exe, err):
-		self.returned = subprocess.check_output([exe, str(self.coeffs)])
+		formattedStr = ', '.join(['{0:f}'.format(i) for i in self.coeffs])
+		self.returned = subprocess.check_output([exe, formattedStr])
 		self.returned = [parseComplex(i) for i in "".join(self.returned[1:-2].split()).split(',')]
 		self.results = testF(self.roots, self.returned, err)
 		self.tested = True

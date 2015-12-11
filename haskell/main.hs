@@ -6,7 +6,7 @@ import Data.List.Split
 import Data.Complex
 
 parse :: String -> [Complex Double]
-parse str = map (parseC . (split (oneOf "+-")) . init . init . tail) $ splitOn ", " $ init $ tail str
+parse str = map (parseC . (split (oneOf "+-")) . init) $ splitOn ", " $ str
     where
         parseC [_, _, x, y, z]
             | y == "+" = (:+) (- read x) $ read z
