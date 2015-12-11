@@ -5,8 +5,8 @@ import Debug.Trace
 
 ---------- POLYNOMIALS ----------
 
--- Data type representing a polynomial -- finite lists only
--- Representation [a0, a1, ... , an] = a0 + a1 x + ... an x ^ n
+-- data type representing a polynomial -- finite lists only
+-- representation [a0, a1, ... , an] = a0 + a1 x + ... an x ^ n
 type Poly = [Complex Double]
 
 instance Num a => Num ([] a) where
@@ -19,22 +19,22 @@ instance Num a => Num ([] a) where
     abs = map abs
     signum _ = []
 
--- Polynomial scalar multiplication with a complex constant
+-- polynomial scalar multiplication with a complex constant
 pSMult :: Complex Double -> Poly -> Poly
 pSMult s = map (*s)
 
--- Polynomial derivative
+-- polynomial derivative
 pD :: Poly -> Poly
 pD (x:xs) = zipWith ((*).(:+ 0)) [1..] xs
 
--- Evaluate a polynomial at a point
+-- evaluate a polynomial at a point
 pEval :: Complex Double -> Poly -> Complex Double
 pEval x (a:as) = a + (x * pEval x as)
 pEval _ [] = 0
 
--- Polynomial division by a linear term
--- Computational overlap with pEval
--- Returns floor( P(x) / (x - c) )
+-- polynomial division by a linear term
+-- computational overlap with pEval
+-- returns floor( P(x) / (x - c) )
 pLinDiv :: Poly -> Complex Double -> Poly
 pLinDiv ps c = tail $ bSeqTrack (reverse ps) c []
 
@@ -42,8 +42,8 @@ bSeqTrack (p:ps) c [] = bSeqTrack ps c [p]
 bSeqTrack (p:ps) c xss@(x:xs) = bSeqTrack ps c $ (p + c * x) : xss
 bSeqTrack [] c xs = xs
 
--- Remove roots at origin
--- Improved with vector implementation?
+-- remove roots at origin
+-- improved with vector implementation?
 pRemZeroRoot :: Poly -> (Poly, Int)
 pRemZeroRoot p = (drop shifts p, shifts)
     where
@@ -131,32 +131,22 @@ s2H p (hM, c) ep
             s2HRec h n xs = s2HRec next (n - 1) $ tFunc p h : xs
                 where (next, c) = sHAdv ep (s!!m) p h
 
--- tests for function explosion
-cNaN :: Complex Double -> Bool
-cNaN (a :+ b) = isNaN a || isNaN b
-naNList :: [Complex Double] -> Bool
-naNList (x:xs)
-    | cNaN x = True
-    | otherwise = naNList xs
-naNList [] = False
-
 -- takes hL and returns the Jenkins-Traub root
 s3H :: Poly -> (Poly, [Complex Double], Int) -> Int -> Double -> (Complex Double, Int)
 s3H p (hL, sL, c) n ep
-    | c == 0 = ((head hL), 1)
+    | c == 0 = ((head hL), 2)
     | otherwise = s3HRec hL sL n
     where
         s3HRec h xss@(x:y:xs) n
-           -- | naNList h = (x, 0)
             | n == 0 = (x, 2)
             | realPart (abs (x - y)) < ep = (x, 1)
             | otherwise = s3HRec (fst (sHAdv ep x p h)) ((tFunc p h) : xss) $ n - 1
 
--- takes a polynomial deg >= 2 to solve, a max number of stage 3 iterations, abd an epsilon error
+-- takes a polynomial deg >= 2 to solve, a max number of stage 3 iterations, and an epsilon error
 -- returns polynomial roots and a completion (2) or cutoff (1) code
 jT :: Poly -> Int -> Double -> [Complex Double]
 jT p n ep
-    | code == 1 = []
+    | code == 2 = []
     | pDef == [] = []
     | otherwise = foundRoot : jT pDef n ep
     where
@@ -164,3 +154,6 @@ jT p n ep
         pDef = pLinDiv p foundRoot
         (pClean, nRoots) = pRemZeroRoot $ pSMult (1 / last p) p
         hL = s2H pClean (s1H pClean ep) ep
+
+pT :: [Complex Double]
+pT = [(-17.3184), 28.988, (-9.73), (-3.2), 1]
