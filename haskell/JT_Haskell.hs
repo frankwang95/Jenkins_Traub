@@ -1,4 +1,5 @@
 module JT_Haskell where
+
 import Data.Complex
 import Debug.Trace
 
@@ -147,7 +148,7 @@ s3H p (hL, sL, c) n ep
 jT :: Poly -> Int -> Double -> [Complex Double]
 jT p n ep
     | code == 2 = []
-    | pDef == [] = []
+    | length pDef == 1 = []
     | otherwise = foundRoot : jT pDef n ep
     where
         (foundRoot, code) = (s3H pClean hL n ep)
