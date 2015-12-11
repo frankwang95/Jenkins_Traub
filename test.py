@@ -46,7 +46,8 @@ class TestPoly:
 	def testPoly(self, exe, err):
 		formattedStr = ', '.join(['{0:f}'.format(i) for i in self.coeffs])
 		self.returned = subprocess.check_output([exe, formattedStr])
-		self.returned = [parseComplex(i) for i in "".join(self.returned[1:-2].split()).split(',')]
+		try: self.returned = [parseComplex(i) for i in "".join(self.returned[1:-2].split()).split(',')]
+		except: return(self.results)
 		self.results = testF(self.roots, self.returned, err)
 		self.tested = True
 		return(self.results)
