@@ -148,7 +148,7 @@ s3H p (hL, sL, c) n ep
 jT :: Poly -> Int -> Double -> [Complex Double]
 jT p n ep
     | code == 2 = []
-    | length pDef == 1 = []
+    | length pDef == 1 = [foundRoot]
     | otherwise = foundRoot : jT pDef n ep
     where
         (foundRoot, code) = (s3H pClean hL n ep)

@@ -12,8 +12,25 @@ def parseComplex(str):
 	split = "".join("".join(str.split('(')).split(')')).split(':+')
 	return(float(split[0]) + float(split[1])*1j)
 
-def results(ro, re):
-	return(0)
+def testF(ro, re, err):
+	if len(ro) != len(re): return(False)
+	while re != []:
+		flag = False
+		for i in range(len(ro)):
+			if abs(re[0] - ro[i]) < err:
+				flag = True
+				break
+		if flag == False: return(False)
+		re = re[1:]
+	return(True)
+
+def runTest(polyList, exe, err):
+	total = len(polyList)
+	sucCount = 0
+	for i in polyList:
+		if i.testPoly(exe, err): sucCount += 1
+	return ({'total' : 0,
+			'sucRate' : sucCount / total})
 
 
 # OBJECTS
@@ -26,13 +43,15 @@ class TestPoly:
 		self.coeffs = self.coeffs.tolist()
 		self.tested = False
 
-	def testPoly(self, exe):
-		returned = subprocess.check_output([exe, str(self.coeffs)])
-		results = [parseComplex(i) for i in "".join(returned[1:-2].split()).split(',')]
+	def testPoly(self, exe, err):
+		self.returned = subprocess.check_output([exe, str(self.coeffs)])
+		self.returned = [parseComplex(i) for i in "".join(self.returned[1:-2].split()).split(',')]
+		self.results = testF(self.roots, self.returned, err)
 		self.tested = True
-		return(0)
+		return(self.results)
 
 
+#################### MAIN ####################
 # SETTING PARAMETERS
 argParser = argparse.ArgumentParser(description = 'Set parameters for Jenkins-Traub testing')
 argParser.add_argument('--exe',
@@ -102,5 +121,6 @@ while n > 0:
 
 print "=========================================================================================="
 
-for i in polyList:
-	i.testPoly(exeFile)
+testResults = runTest(polyList, exeFile, err)
+print ("Test performed with parameters above")
+print ("Success rate: {0}".format(testResults["sucRate"]))
