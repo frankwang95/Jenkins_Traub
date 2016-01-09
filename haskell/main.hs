@@ -18,5 +18,5 @@ parse str = map (parseC . (split (oneOf "+-")) . init) $ splitOn ", " $ str
 main = do 
     args <- getArgs
     let poly = parse $ args !! 0
-    let results = jT poly 40 0.00000001
+    let results = jT poly 40 $ read $ args !! 1
     putStrLn $ show $ results

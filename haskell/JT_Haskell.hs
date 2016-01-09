@@ -1,7 +1,6 @@
 module JT_Haskell where
 
 import Data.Complex
-import Debug.Trace
 
 
 ---------- POLYNOMIALS ----------
